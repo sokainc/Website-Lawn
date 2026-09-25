@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, type ReactNode, useState } from "react";
+import Image from "next/image";
 import {
   ArrowRight, CalendarDays, Check, CheckCircle2, ChevronRight, Clock3,
   Leaf, MapPin, Menu, MessageCircle, Phone, Scissors, ShieldCheck,
@@ -14,6 +15,7 @@ import { Progress } from "@/components/ui/progress";
 import {
   ADD_ONS, type Frequency, type GrassHeight, type PriceBreakdown, type QuoteInput,
 } from "@/lib/pricing";
+import { isValidPhone, isValidPreferredDate, todayInMarket } from "@/lib/request-validation";
 
 const services = [
   ["Lawn Mowing", "A clean, even cut with hard surfaces blown clear.", "$19", Scissors],
@@ -72,7 +74,7 @@ const initialLocation: LocationFields = {
   address: "", city: "West Lafayette", state: "IN", postalCode: "",
 };
 const initialQuote: QuoteInput = {
-  lotSize: 5000, frequency: "biweekly", grassHeight: "maintained", gated: false, addOns: ["edging"],
+  lotSize: 5000, frequency: "biweekly", grassHeight: "maintained", gated: false, addOns: [],
 };
 const initialContact: ContactFields = {
   name: "", email: "", phone: "", preferredDate: "", notes: "", consent: false, companyWebsite: "",
@@ -100,6 +102,7 @@ function QuoteFlow() {
   const [result, setResult] = useState<{ reference: string; price: number; address: string } | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [today] = useState(todayInMarket);
 
   const nextLocation = (event: FormEvent) => {
     event.preventDefault();
@@ -126,7 +129,16 @@ function QuoteFlow() {
   };
 
   const submitRequest = async (event: FormEvent) => {
-    event.preventDefault(); setBusy(true); setError("");
+    event.preventDefault(); setError("");
+    if (!isValidPhone(contact.phone.trim())) {
+      setError("Enter a valid phone number with at least 10 digits.");
+      return;
+    }
+    if (!isValidPreferredDate(contact.preferredDate)) {
+      setError("Choose today or a future start date.");
+      return;
+    }
+    setBusy(true);
     try {
       const response = await fetch("/api/requests", {
         method: "POST", headers: { "content-type": "application/json" },
@@ -192,7 +204,7 @@ function QuoteFlow() {
             <div className="rounded-2xl bg-[#f1f7ec] p-5"><p className="text-xs font-black uppercase tracking-[.15em] text-[#327840]">Your preliminary price</p><div className="mt-1 flex items-end justify-between"><strong className="text-5xl tracking-[-.06em] text-[#173f2d]">${price.total}</strong><span className="pb-2 text-sm text-[#607064]">per visit</span></div><div className="mt-4 space-y-2 border-t border-[#cddbc8] pt-4 text-sm"><div className="flex justify-between"><span>Base mowing</span><strong>${price.mowing}</strong></div>{price.frequencyAdjustment !== 0 && <div className="flex justify-between"><span>Frequency adjustment</span><strong>{price.frequencyAdjustment > 0 ? "+" : "−"}${Math.abs(price.frequencyAdjustment)}</strong></div>}{price.conditionAdjustment > 0 && <div className="flex justify-between"><span>Grass condition</span><strong>+${price.conditionAdjustment}</strong></div>}{price.accessAdjustment > 0 && <div className="flex justify-between"><span>Property access</span><strong>+${price.accessAdjustment}</strong></div>}{price.addOns.map((item) => <div key={item.id} className="flex justify-between"><span>{item.name}</span><strong>+${item.price}</strong></div>)}</div></div>
             <div><h2 className="text-2xl font-black tracking-[-.04em] text-[#173f2d]">Where should we send confirmation?</h2><p className="mt-1 text-sm text-[#607064]">Submitting saves this quote as a new service request. No payment is taken.</p></div>
             <div className="grid gap-4 sm:grid-cols-2"><div><FieldLabel htmlFor="name">Full name</FieldLabel><Input id="name" autoComplete="name" value={contact.name} onChange={(e) => setContact({ ...contact, name: e.target.value })} className="h-12" required /></div><div><FieldLabel htmlFor="phone">Phone</FieldLabel><Input id="phone" type="tel" autoComplete="tel" value={contact.phone} onChange={(e) => setContact({ ...contact, phone: e.target.value })} className="h-12" required /></div></div>
-            <div className="grid gap-4 sm:grid-cols-2"><div><FieldLabel htmlFor="email">Email</FieldLabel><Input id="email" type="email" autoComplete="email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} className="h-12" required /></div><div><FieldLabel htmlFor="date">Preferred start date</FieldLabel><Input id="date" type="date" value={contact.preferredDate} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setContact({ ...contact, preferredDate: e.target.value })} className="h-12" /></div></div>
+            <div className="grid gap-4 sm:grid-cols-2"><div><FieldLabel htmlFor="email">Email</FieldLabel><Input id="email" type="email" autoComplete="email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} className="h-12" required /></div><div><FieldLabel htmlFor="date">Preferred start date</FieldLabel><Input id="date" type="date" value={contact.preferredDate} min={today || undefined} onChange={(e) => setContact({ ...contact, preferredDate: e.target.value })} className="h-12" /></div></div>
             <div><FieldLabel htmlFor="notes">Anything your pro should know? <span className="font-normal text-[#607064]">Optional</span></FieldLabel><textarea id="notes" value={contact.notes} onChange={(e) => setContact({ ...contact, notes: e.target.value })} maxLength={1000} rows={3} className="w-full rounded-xl border border-[#cddbc8] bg-white px-3 py-2 text-base outline-none focus:border-[#327840] focus:ring-3 focus:ring-[#327840]/20" placeholder="Pets, gate code, steep areas, or timing notes" /></div>
             <div className="sr-only" aria-hidden="true"><label htmlFor="company-website">Company website</label><input id="company-website" tabIndex={-1} autoComplete="off" value={contact.companyWebsite} onChange={(e) => setContact({ ...contact, companyWebsite: e.target.value })} /></div>
             <label className="flex cursor-pointer items-start gap-3 text-sm text-[#4f6256]"><input type="checkbox" checked={contact.consent} onChange={(e) => setContact({ ...contact, consent: e.target.checked })} className="mt-1 size-4 accent-[#327840]" required /><span>I agree that GreenBlade may contact me about this lawn-care request. Standard message and data rates may apply.</span></label>
@@ -219,7 +231,7 @@ export function GreenBladeApp() {
       <header className="sticky top-0 z-40 border-b border-[#e3eadf] bg-white/95 backdrop-blur-xl"><div className="mx-auto flex h-20 max-w-7xl items-center gap-6 px-5 sm:px-8"><Brand /><nav className="ml-auto hidden items-center gap-7 text-sm font-bold lg:flex"><a href="#services">Services</a><a href="#how">How it works</a><a href="#pricing">Pricing</a><a href="#reviews">Reviews</a><a href="#faq">FAQ</a></nav><a href="tel:+17655550190" className="ml-auto hidden text-sm font-bold xl:block">(765) 555-0190</a><Button asChild className="ml-auto hidden bg-[#173f2d] sm:inline-flex lg:ml-0"><a href="#quote">Get a quote</a></Button><Button variant="ghost" size="icon" className="ml-auto lg:hidden" aria-label={menuOpen ? "Close menu" : "Open menu"} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X /> : <Menu />}</Button></div>{menuOpen && <nav className="grid border-t border-[#e3eadf] bg-white px-5 py-3 text-sm font-bold lg:hidden">{[["Services","services"],["How it works","how"],["Pricing","pricing"],["Reviews","reviews"],["FAQ","faq"]].map(([label,id]) => <a key={id} href={`#${id}`} onClick={() => setMenuOpen(false)} className="py-3">{label}</a>)}</nav>}</header>
 
       <main>
-        <section className="overflow-hidden bg-[#f1f7ec]"><div className="mx-auto grid max-w-7xl gap-12 px-5 py-14 sm:px-8 lg:grid-cols-[.9fr_1.1fr] lg:items-center lg:py-20"><div><p className="mb-5 flex items-center gap-2 text-xs font-black uppercase tracking-[.17em] text-[#327840]"><MapPin className="size-4" />West Lafayette, Indiana</p><h1 className="text-5xl font-black leading-[.98] tracking-[-.065em] text-[#173f2d] sm:text-6xl">A greener lawn.<br /><span className="font-medium">A price you can see.</span></h1><p className="mt-6 max-w-xl text-lg leading-8 text-[#55685b]">Build your quote, send the request, and let a local pro take the yard work from here. Mowing starts at $19.</p><div className="mt-7 flex flex-wrap gap-5 text-sm font-bold text-[#173f2d]"><span className="flex items-center gap-2"><Star className="size-4 fill-[#327840] text-[#327840]" />4.8 sample rating</span><span className="flex items-center gap-2"><ShieldCheck className="size-4 text-[#327840]" />Background-checked pros</span></div><div className="relative mt-9 overflow-hidden rounded-[2rem] lg:rounded-[4rem_1.5rem_1.5rem_1.5rem]"><img src="/hero.jpg" alt="Green residential lawn outside a welcoming home" className="h-64 w-full object-cover sm:h-80" /><span className="absolute bottom-4 left-4 rounded-full bg-white/95 px-4 py-2 text-xs font-black text-[#173f2d] shadow-lg">Fresh cut. Zero weekend work.</span></div></div><QuoteFlow /></div></section>
+        <section className="overflow-hidden bg-[#f1f7ec]"><div className="mx-auto grid max-w-7xl gap-12 px-5 py-14 sm:px-8 lg:grid-cols-[.9fr_1.1fr] lg:items-center lg:py-20"><div><p className="mb-5 flex items-center gap-2 text-xs font-black uppercase tracking-[.17em] text-[#327840]"><MapPin className="size-4" />West Lafayette, Indiana</p><h1 className="text-5xl font-black leading-[.98] tracking-[-.065em] text-[#173f2d] sm:text-6xl">A greener lawn.<br /><span className="font-medium">A price you can see.</span></h1><p className="mt-6 max-w-xl text-lg leading-8 text-[#55685b]">Build your quote, send the request, and let a local pro take the yard work from here. Mowing starts at $19.</p><div className="mt-7 flex flex-wrap gap-5 text-sm font-bold text-[#173f2d]"><span className="flex items-center gap-2"><Star className="size-4 fill-[#327840] text-[#327840]" />4.8 sample rating</span><span className="flex items-center gap-2"><ShieldCheck className="size-4 text-[#327840]" />Background-checked pros</span></div><div className="relative mt-9 overflow-hidden rounded-[2rem] lg:rounded-[4rem_1.5rem_1.5rem_1.5rem]"><Image src="/hero.jpg" alt="Green residential lawn outside a welcoming home" width={1600} height={1067} priority sizes="(min-width: 1024px) 42vw, 100vw" className="h-64 w-full object-cover sm:h-80" /><span className="absolute bottom-4 left-4 rounded-full bg-white/95 px-4 py-2 text-xs font-black text-[#173f2d] shadow-lg">Fresh cut. Zero weekend work.</span></div></div><QuoteFlow /></div></section>
 
         <section aria-label="Service benefits" className="border-y border-[#e3eadf]"><div className="mx-auto grid max-w-7xl gap-6 px-5 py-7 text-sm sm:grid-cols-2 sm:px-8 lg:grid-cols-4">{serviceBenefits.map(([Icon,title,copy]) => <div key={title} className="flex gap-3"><Icon className="mt-1 size-6 text-[#327840]" /><div><strong className="text-[#173f2d]">{title}</strong><p className="text-[#607064]">{copy}</p></div></div>)}</div></section>
 
