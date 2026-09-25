@@ -70,11 +70,13 @@ export function isQuoteInput(value: unknown): value is QuoteInput {
   if (!value || typeof value !== "object") return false;
   const item = value as Record<string, unknown>;
   return (
-    typeof item.lotSize === "number" && Number.isFinite(item.lotSize) &&
+    typeof item.lotSize === "number" && Number.isInteger(item.lotSize) &&
     item.lotSize >= 500 && item.lotSize <= 100000 &&
     FREQUENCIES.includes(item.frequency as Frequency) &&
     GRASS_HEIGHTS.includes(item.grassHeight as GrassHeight) &&
     typeof item.gated === "boolean" && Array.isArray(item.addOns) &&
+    item.addOns.length <= ADD_ONS.length &&
+    new Set(item.addOns).size === item.addOns.length &&
     item.addOns.every((id) => typeof id === "string" && ADD_ONS.some((service) => service.id === id))
   );
 }
