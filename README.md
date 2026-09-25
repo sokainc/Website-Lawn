@@ -1,4 +1,23 @@
-# vinext-starter
+# GreenBlade Lawn Care
+
+An illustrative West Lafayette lawn-care site with server-calculated quotes and
+service requests stored in Cloudflare D1. The business, testimonials, phone
+number, and prices are examples. This app does not schedule pros or take payments.
+
+## Run locally
+
+Use Node.js 22.13 or newer. Run `npm ci`, then `npm run build` once to create
+`dist/server/wrangler.json`. Apply the included schema to the local D1 database:
+
+```sh
+node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_greenblade_requests.sql
+```
+
+Run `npm run dev` and open `http://localhost:5173/`. Apply the migration once
+per new local database. Without it, quotes work but submitting a request fails
+because `service_requests` does not exist. The hosted D1 database is separate.
+
+## Framework notes
 
 A clean full-stack starter running on [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and Drizzle support.
 
@@ -103,7 +122,7 @@ Use SIWC for account pages, user-specific dashboards, saved records, and write a
 For a D1-backed local preview, generate SQL with `npm run db:generate`. Build once through the Sites skill's build entrypoint (or `npm run build` for standalone use) to generate `dist/server/wrangler.json`, rebuilding if bindings change. From the project root, apply each pending migration in order:
 
 ```sh
-node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_example.sql
+node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_greenblade_requests.sql
 ```
 
 Replace the filename with the pending migration and `DB` with your D1 binding name if different. Use `.wrangler/state`, not `.wrangler/state/v3`; Wrangler adds the versioned directories. Do not replay migrations already applied locally. This updates only the preview database; publishing applies production migrations separately.
